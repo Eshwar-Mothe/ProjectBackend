@@ -7,5 +7,15 @@
     "state": "USA",
     "password": "$2b$10$3M77Ngc760nUJPuLdT5mxuIaNFkFjUDFDjlphF/lwI6dzr4mp/LG.",
     "role": "user"
+  },
+  {
+    "id": "AT2025071752748556687",
+    "name": "Eshwar",
+    "email": "jithendri.r2020@gmail.com",
+    "phone": "8125647154",
+    "state": "Colorado (CO)",
+    "password": "$2b$10$7KfdbzfnMigwssJv/S7sPeJDfjE/dfw0YyCfnZFKZrqb6OGRnKd7e",
+    "role": "user",
+    "createdAt": "2025-07-17T10:35:56.687Z"
   }
 ]
