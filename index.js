@@ -116,6 +116,14 @@ app.post('/login', async (req, res) => {
   }
 });
 
+app.get('/data', (req, res) => {
+  fs.readFile('./data.json', 'utf8', (err, data) => {
+    if (err) return res.status(500).json({ error: 'Could not read file' });
+    res.json(JSON.parse(data));
+  });
+});
+
+
 
 
 app.listen(PORT, () => {
