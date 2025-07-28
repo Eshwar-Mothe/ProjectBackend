@@ -2,9 +2,10 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
-const AWS = require('aws-sdk');
-const multer = require('multer');
-const multerS3 = require('multer-s3');
+
+// const AWS = require('aws-sdk');
+// const multer = require('multer');
+// const multerS3 = require('multer-s3');
 
 
 const sendMail = require('./mailService');
@@ -16,7 +17,7 @@ const mongoose = require('mongoose');
 const userSchema = require('./models/User');
 const adminSchema = require('./models/Admin');
 const UserDocsSchema = require('./models/UserDocs');
-const upload = require('./utils/upload')
+// const upload = require('./utils/upload')
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -43,7 +44,7 @@ monitorConnection(adminConnection, 'AdminDB');
 
 const User = userConnection.model('User', userSchema);
 const Admin = adminConnection.model('Admin', adminSchema);
-const UserDocs = userConnection.model('UserDocs', UserDocsSchema);
+// const UserDocs = userConnection.model('UserDocs', UserDocsSchema);
 
 
 const server = http.createServer(app);
@@ -205,19 +206,19 @@ app.post('/sendMail', async (req, res) => {
 //   }
 // });
 
-// app.post('/admin/create', async (req, res) => {
-//   const { adminName, email, password } = req.body;
-//   try {
-//     const exists = await Admin.findOne({ email });
-//     if (exists) return res.status(409).json({ success: false, message: "Admin already exists" });
-//     const hashedPassword = await bcrypt.hash(password, 10);
-//     const newAdmin = new Admin({ adminName, email, password: hashedPassword });
-//     await newAdmin.save();
-//     res.status(201).json({ success: true, message: "Admin created", admin: newAdmin });
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// });
+app.post('/admin/create', async (req, res) => {
+  const { adminName, email, password } = req.body;
+  try {
+    const exists = await Admin.findOne({ email });
+    if (exists) return res.status(409).json({ success: false, message: "Admin already exists" });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newAdmin = new Admin({ adminName, email, password: hashedPassword });
+    await newAdmin.save();
+    res.status(201).json({ success: true, message: "Admin created", admin: newAdmin });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 
 app.get('/data', async (req, res) => {
