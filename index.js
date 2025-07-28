@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 5000;
 const userConnection = mongoose.createConnection(process.env.MONGO_URI, { dbName: 'users', });
 const adminConnection = mongoose.createConnection(process.env.MONGO_URI, { dbName: 'adminData', });
 
-console.log(MONGO_URI)
+console.log(process.env.MONGO_URI)
 
 function monitorConnection(connection, name) {
   connection.on('connected', () => {
