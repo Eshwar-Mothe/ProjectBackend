@@ -13,8 +13,8 @@ const adminSchema = require('./models/Admin');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const userConnection = mongoose.createConnection(process.env.MONGO_URI, { dbName: 'users', });
-const adminConnection = mongoose.createConnection(process.env.MONGO_URI, { dbName: 'adminData', });
+const userConnection = mongoose.createConnection(process.env.MONGO_URI, { dbName: 'userData', });
+const adminConnection = mongoose.createConnection(process.env.MONGO_URI, { dbName: 'admins', });
 
 function monitorConnection(connection, name) {
   connection.on('connected', () => {
