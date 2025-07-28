@@ -244,7 +244,7 @@ app.get('/api/admin/stats', async (req, res) => {
     const recentUsers = await User.find()
       .sort({ createdAt: -1 })
       .limit(5)
-      .select('name email -_id')
+      .select('name email phone-_id')
       .lean();
 
     res.json({
