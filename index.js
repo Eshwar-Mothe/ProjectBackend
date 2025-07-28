@@ -16,7 +16,7 @@ const mongoose = require('mongoose');
 const userSchema = require('./models/User');
 const adminSchema = require('./models/Admin');
 const UserDocsSchema = require('./models/UserDocs');
-// const upload = require('./utils/upload')
+const upload = require('./utils/upload')
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -244,7 +244,7 @@ app.get('/api/admin/stats', async (req, res) => {
     const recentUsers = await User.find()
       .sort({ createdAt: -1 })
       .limit(5)
-      .select('name email phone-_id')
+      .select('name email phone -_id')
       .lean();
 
     res.json({
