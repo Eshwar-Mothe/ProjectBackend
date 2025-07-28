@@ -3,12 +3,12 @@ require("dotenv").config();
 
 
 const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || "smtp.gmail.com",
-    port: process.env.EMAIL_PORT || 587,
+    host: process.env.EMAIL_HOST,
+    port: process.env.EMAIL_PORT,
     secure: process.env.EMAIL_SECURE === "true", 
     auth: {
-        user: 'rupeeinsight@gmail.com',
-        pass: 'pwzr ddeq hmht noqz',
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS,
     },
 });
 
