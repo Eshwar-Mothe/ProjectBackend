@@ -16,7 +16,7 @@ const mongoose = require('mongoose');
 const userSchema = require('./models/User');
 const adminSchema = require('./models/Admin');
 const UserDocsSchema = require('./models/UserDocs');
-const upload = require('./utils/upload')
+// const upload = require('./utils/upload')
 
 const app = express();
 const PORT = process.env.PORT || 5000;
