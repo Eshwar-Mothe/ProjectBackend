@@ -208,6 +208,7 @@ app.post('/sendMail', async (req, res) => {
 
 app.post('/adminData', async (req, res) => {
   const { adminName, email, password } = req.body;
+  console.log(adminName,email, password)
   try {
     const exists = await Admin.findOne({ email });
     if (exists) return res.status(409).json({ success: false, message: "Admin already exists" });
