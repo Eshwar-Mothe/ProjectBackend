@@ -215,7 +215,7 @@ app.post('/adminData', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const newAdmin = new Admin({ adminName, email, password: hashedPassword });
     await newAdmin.save();
-    res.status(201).json({ success: true, message: "Admin created", admin: newAdmin });
+    res.json({ status: 201, message: "Admin created", admin: newAdmin });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
