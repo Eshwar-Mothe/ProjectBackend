@@ -206,7 +206,7 @@ app.post('/sendMail', async (req, res) => {
 //   }
 // });
 
-app.post('/admin/create', async (req, res) => {
+app.post('/adminData', async (req, res) => {
   const { adminName, email, password } = req.body;
   try {
     const exists = await Admin.findOne({ email });
