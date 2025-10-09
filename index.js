@@ -3,11 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 
-// const AWS = require('aws-sdk');
-// const multer = require('multer');
-// const multerS3 = require('multer-s3');
-
-
 const sendMail = require('./mailService');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -17,13 +12,17 @@ const mongoose = require('mongoose');
 const userSchema = require('./models/User');
 const adminSchema = require('./models/Admin');
 const UserDocsSchema = require('./models/UserDocs');
-// const upload = require('./utils/upload')
+const referralSchema = require('./models/Referral');
+const upload = require('./utils/upload');
+const UserDocs = require('./models/UserDocs');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 const userConnection = mongoose.createConnection(process.env.MONGO_URI, { dbName: 'userData', });
 const adminConnection = mongoose.createConnection(process.env.MONGO_URI, { dbName: 'admins', });
+const referralConnection = mongoose.createConnection(process.env.MONGO_URI, { dbName: 'referralsData', });
+
 
 function monitorConnection(connection, name) {
   connection.on('connected', () => {
@@ -41,10 +40,13 @@ function monitorConnection(connection, name) {
 
 monitorConnection(userConnection, 'UserDB');
 monitorConnection(adminConnection, 'AdminDB');
+monitorConnection(referralConnection, 'ReferralDB');
+
 
 const User = userConnection.model('User', userSchema);
 const Admin = adminConnection.model('Admin', adminSchema);
-// const UserDocs = userConnection.model('UserDocs', UserDocsSchema);
+const Referral = referralConnection.model('Referral', referralSchema)
+
 
 
 const server = http.createServer(app);
@@ -167,48 +169,89 @@ app.post('/sendMail', async (req, res) => {
   }
 });
 
+app.post('/users/isExist', async (req, res) => {
+  const { email } = req.body;
+  try {
+    if (!email) return res.status(400).json({ message: "Email is required" })
+
+    const isUserExist = await User.findOne({ email })
+
+    if (!isUserExist) return res.status(404).json({ message: "User not found" })
+
+    return res.status(200).json({ userDetails: isUserExist })
+
+  } catch (err) {
+    console.error("Error in /users/isExist:", err.message);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+})
 
 
-// app.post('/user/docs', upload.array('docs', 10), async (req, res) => {
-//   const { userId, docNames } = req.body;
+app.post('/referralData', async (req, res) => {
+  const { user, referrals } = req.body
+  console.log(user, referrals, "received@backend")
+  try {
+    if (!user || !referrals) return res.status(400).json({ message: "User and referrals are required" })
 
-//   try {
-//     if (!req.files || req.files.length === 0) {
-//       return res.status(400).json({ success: false, message: "No documents uploaded" });
-//     }
+    const isExistingUser = await User.findOne({ email: user.email })
 
-//     const names = docNames?.split(',').map(n => n.trim()) || [];
+    const referralDoc = new Referral({
+      user,
+      referrals,
+      isExistingUser: !!isExistingUser
+    })
 
-//     if (names.length !== req.files.length) {
-//       return res.status(400).json({ success: false, message: "Mismatch between doc names and files" });
-//     }
+    await referralDoc.save()
 
-//     const docs = req.files.map((file, index) => ({
-//       name: names[index] || file.originalname,
-//       url: file.location,
-//     }));
+    return res.status(200).json({ message: "Referral Saved Successfully", data: referralDoc })
+  } catch (err) {
+    console.log("Error in /referralData", err)
+    return res.status(500).json({ message: "Internal Server Error" })
+  }
+})
 
-//     const newDocEntry = new UserDocs({
-//       userId,
-//       documents: docs,
-//     });
+app.post('/user/docs', upload.array('docs', 10), async (req, res) => {
+  const { userId, docs } = req.body;
 
-//     await newDocEntry.save();
 
-//     res.status(201).json({
-//       success: true,
-//       message: 'Documents uploaded successfully',
-//       documents: newDocEntry,
-//     });
-//   } catch (err) {
-//     console.error("Error in /user/docs:", err.message);
-//     res.status(500).json({ success: false, message: "Server error" });
-//   }
-// });
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: "No documents uploaded" });
+    }
+
+    const names = docs ? docs.split(',').map(n => n.trim()) : req.files.map(f => f.originalname);
+
+    if (names.length !== req.files.length) {
+      return res.status(400).json({ success: false, message: "Mismatch between doc names and files" });
+    }
+
+    const uploadedDocs = req.files.map((file, index) => ({
+      name: names[index] || file.originalname,
+      url: file.location,
+      s3Key: file.key,
+    }));
+
+    const newDocEntry = new UserDocs({
+      userId,
+      documents: uploadedDocs,
+    });
+
+    await newDocEntry.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Documents uploaded successfully',
+      documents: newDocEntry,
+    });
+  } catch (err) {
+    console.error("Error in /user/docs:", err.message);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
 
 app.post('/adminData', async (req, res) => {
   const { adminName, email, password } = req.body;
-  console.log(adminName,email, password)
+  console.log(adminName, email, password)
   try {
     const exists = await Admin.findOne({ email });
     if (exists) return res.status(409).json({ success: false, message: "Admin already exists" });
@@ -230,6 +273,46 @@ app.get('/data', async (req, res) => {
     res.status(500).json({ error: 'Could not fetch users' });
   }
 });
+
+app.get('/users/referralData', async (req, res) => {
+  try {
+    const referralData = await Referral.find().lean()
+    res.json(referralData)
+  } catch (err) {
+    console.log("Failed to fetch referrals", err)
+    res.status(500).json({ message: "Internal Server error, Try again later" })
+  }
+})
+
+// API call to fetch the urls uploaded by the users
+
+app.get('/admin/user/docs/:userId', async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const userDocs = await UserDocs.findOne({ userId }).lean();
+    if (!userDocs) {
+      return res.status(404).json({ success: false, message: 'No documents found for this user' });
+    }
+
+    // Generate signed URLs for each document
+    const docsWithSignedUrls = await Promise.all(
+      userDocs.documents.map(async (doc) => {
+        const signedUrl = await getSignedFileUrl(doc.url.replace(`https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/`, ''));
+        return {
+          ...doc,
+          signedUrl,
+        };
+      })
+    );
+
+    res.json({ success: true, documents: docsWithSignedUrls });
+  } catch (err) {
+    console.error("Error in /admin/user/docs/:userId:", err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 
 app.get('/api/admin/stats', async (req, res) => {
   try {
