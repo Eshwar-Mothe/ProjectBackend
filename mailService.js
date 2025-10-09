@@ -1,24 +1,24 @@
-const nodemailer = require("nodemailer");
-require("dotenv").config();
-
+const nodemailer = require('nodemailer');
+require('dotenv').config();
 
 const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    secure: process.env.EMAIL_SECURE === "true", 
+    port: Number(process.env.EMAIL_PORT) || 587,
+    secure: process.env.EMAIL_SECURE === 'true',
     auth: {
         user: process.env.MAIL_USER,
         pass: process.env.MAIL_PASS,
     },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
 });
 
 const sendMail = async (payload) => {
     try {
-        const { to, subject, html } = payload
+        const { to, subject, html } = payload;
         if (!to || !subject || !html) {
             throw new Error("Missing required email parameters: 'to', 'subject', or 'html'");
         }
-        console.log("sent message successfully")
 
         const info = await transporter.sendMail({
             from: `"Adwik Tax Consultancy" <no-reply@adwik.com>`,
@@ -34,7 +34,5 @@ const sendMail = async (payload) => {
         return { success: false, error: error.message, status: 500 };
     }
 };
-
-
 
 module.exports = sendMail;
