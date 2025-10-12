@@ -21,7 +21,7 @@ const sendMail = async (payload) => {
         console.log("sent message successfully")
 
         const info = await transporter.sendMail({
-            from: `"Adwik Tax Consultancy" <no-reply@adwik.com>`,
+            from: `"Aadwik Tax Solutions" <no-reply@aadwiktaxsolutions.com>`,
             to,
             subject,
             html,
