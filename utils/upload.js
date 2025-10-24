@@ -1,8 +1,8 @@
-const { S3Client } = require("@aws-sdk/client-s3");
-const multer = require("multer");
-const multerS3 = require("multer-s3");
+import { S3Client } from "@aws-sdk/client-s3";
+import multer from "multer";
+import multerS3 from "multer-s3";
 
-const s3 = new S3Client({
+export const s3 = new S3Client({
   region: process.env.AWS_REGION,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY,
@@ -10,25 +10,24 @@ const s3 = new S3Client({
   },
 });
 
-const upload = multer({
+export const upload = multer({
   storage: multerS3({
     s3,
     bucket: process.env.AWS_S3_BUCKET_NAME,
     acl: "private",
-    key: (req, file, cb) => {
-      // ✅ Ensure string conversion
-      const userId = String(req.body.userId || "anonymous");
-      const timestamp = Date.now();
-      const originalName = String(file.originalname || "file");
-
-      const uniqueName = `${userId}-${timestamp}-${originalName}`;
-
-      console.log("Uploading file with key:", uniqueName); // debug log
-      cb(null, uniqueName);
-    },
     contentType: multerS3.AUTO_CONTENT_TYPE,
+    key: (req, file, cb) => {
+      try {
+        const userId = String(req.body.userId || "anonymous");
+        const timestamp = Date.now();
+        const cleanName = file.originalname.replace(/\s+/g, "_");
+        const uniqueKey = `${userId}-${timestamp}-${cleanName}`;
+        console.log("📤 Uploading file with key:", uniqueKey);
+        cb(null, uniqueKey);
+      } catch (err) {
+        cb(err);
+      }
+    },
   }),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per file
 });
-
-module.exports = upload;

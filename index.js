@@ -13,8 +13,9 @@ const userSchema = require('./models/User');
 const adminSchema = require('./models/Admin');
 const UserDocsSchema = require('./models/UserDocs');
 const referralSchema = require('./models/Referral');
-const upload = require('./utils/upload');
+const { upload } = require('./utils/upload');
 const UserDocs = require('./models/UserDocs');
+const { getSignedFileUrl } = require('./utils/s3Utils');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -213,17 +214,22 @@ app.post('/referralData', async (req, res) => {
 app.post('/user/docs', upload.array('docs', 10), async (req, res) => {
   const { userId, docs } = req.body;
 
-
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ success: false, message: "No documents uploaded" });
     }
 
-    const names = docs ? docs.split(',').map(n => n.trim()) : req.files.map(f => f.originalname);
 
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, message: "Invalid userId format" });
+    }
+
+
+    const names = docs ? docs.split(',').map(n => n.trim()) : req.files.map(f => f.originalname);
     if (names.length !== req.files.length) {
       return res.status(400).json({ success: false, message: "Mismatch between doc names and files" });
     }
+
 
     const uploadedDocs = req.files.map((file, index) => ({
       name: names[index] || file.originalname,
@@ -231,23 +237,24 @@ app.post('/user/docs', upload.array('docs', 10), async (req, res) => {
       s3Key: file.key,
     }));
 
-    const newDocEntry = new UserDocs({
-      userId,
-      documents: uploadedDocs,
-    });
 
-    await newDocEntry.save();
+    const updatedUserDocs = await UserDocs.findOneAndUpdate(
+      { userId },
+      { $push: { documents: { $each: uploadedDocs } } },
+      { new: true, upsert: true }
+    );
 
     res.status(201).json({
       success: true,
-      message: 'Documents uploaded successfully',
-      documents: newDocEntry,
+      message: "Documents uploaded successfully",
+      documents: updatedUserDocs.documents,
     });
   } catch (err) {
-    console.error("Error in /user/docs:", err.message);
+    console.error("Error in /user/docs:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 
 app.post('/adminData', async (req, res) => {
   const { adminName, email, password } = req.body;
@@ -288,28 +295,78 @@ app.get('/users/referralData', async (req, res) => {
 
 app.get('/admin/user/docs/:userId', async (req, res) => {
   const { userId } = req.params;
+  console.log("userId", userId);
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(400).json({ success: false, message: "Invalid userId format" });
+  }
 
   try {
-    const userDocs = await UserDocs.findOne({ userId }).lean();
-    if (!userDocs) {
+    const userDocsList = await UserDocs.find({ userId }).lean();
+
+    if (!userDocsList || userDocsList.length === 0) {
       return res.status(404).json({ success: false, message: 'No documents found for this user' });
     }
 
-    // Generate signed URLs for each document
+    // Combine all document arrays into one flat array
+    const allDocuments = userDocsList.flatMap(docRecord => docRecord.documents);
+
+    // ✅ Generate signed URLs correctly and return only name + signedUrl
     const docsWithSignedUrls = await Promise.all(
-      userDocs.documents.map(async (doc) => {
-        const signedUrl = await getSignedFileUrl(doc.url.replace(`https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/`, ''));
-        return {
-          ...doc,
-          signedUrl,
-        };
+      allDocuments.map(async (doc) => {
+        const key = doc.s3Key || doc.url.split('.com/')[1];
+        const signedUrl = await getSignedFileUrl(key);
+        return { _id: doc._id, name: doc.name, signedUrl, uploadedAt: doc.uploadedAt };
       })
     );
 
+    console.log("All docs fetched from AWS:", docsWithSignedUrls);
     res.json({ success: true, documents: docsWithSignedUrls });
+
   } catch (err) {
     console.error("Error in /admin/user/docs/:userId:", err);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+app.get('/viewDoc/:docId', async (req, res) => {
+  try {
+    const docId = req.params.docId;
+    console.log("DocId", docId)
+
+    const userDocs = await UserDocs.findOne({ "documents._id": docId });
+    const doc = userDocs?.documents.id(docId);
+
+    if (!doc) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    const signedUrl = await getSignedFileUrl(doc.s3Key);
+    console.log(signedUrl)
+    res.redirect(signedUrl);
+  } catch (err) {
+    console.error("❌ Error generating signed URL:", err);
+    res.status(500).json({ error: "Failed to fetch document" });
+  }
+})
+
+app.get('/api/userDocs/all', async (req, res) => {
+  try {
+    // Fetch all userDocs (without populate)
+    const allDocs = await UserDocs.find().lean();
+
+    // Manually attach user details
+    const result = await Promise.all(
+      allDocs.map(async (entry) => {
+        const user = await User.findById(entry.userId).select('name email uid');
+        return { ...entry, user };
+      })
+    );
+    console.log(result)
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("❌ Error while fetching the userDocs:", err);
+    res.status(500).json({ message: "Error fetching documents", err });
   }
 });
 
@@ -341,20 +398,6 @@ app.get('/api/admin/stats', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
-
-// app.get('/user/docs/:userId', async (req, res) => {
-//   try {
-//     const { userId } = req.params;
-//     const docs = await UserDocs.findOne({ userId });
-//     if (!docs) {
-//       return res.status(404).json({ success: false, message: 'No documents found' });
-//     }
-//     res.json({ success: true, documents: docs });
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: 'Server error' });
-//   }
-// });
 
 server.listen(PORT, () => {
   console.log(`Server listening at http://localhost:${PORT}`);
