@@ -12,7 +12,7 @@ const getSignedFileUrl = async (key) => {
         Key: key,
     });
 
-    // URL expires in 1 hour (3600 seconds)
+    // URL expires in 5 min (3600 seconds)
     return await getSignedUrl(s3, command, { expiresIn: 300 });
 };
 

@@ -55,6 +55,8 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
+app.set("io", io);
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -211,25 +213,24 @@ app.post('/referralData', async (req, res) => {
   }
 })
 
-app.post('/user/docs', upload.array('docs', 10), async (req, res) => {
+app.post("/user/docs", upload.array("docs", 10), async (req, res) => {
   const { userId, docs } = req.body;
+  const io = req.app.get("io"); // ✅ Access Socket.IO instance
 
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ success: false, message: "No documents uploaded" });
     }
 
-
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ success: false, message: "Invalid userId format" });
     }
 
-
-    const names = docs ? docs.split(',').map(n => n.trim()) : req.files.map(f => f.originalname);
+    // ✅ Prepare file metadata
+    const names = docs ? docs.split(",").map((n) => n.trim()) : req.files.map((f) => f.originalname);
     if (names.length !== req.files.length) {
       return res.status(400).json({ success: false, message: "Mismatch between doc names and files" });
     }
-
 
     const uploadedDocs = req.files.map((file, index) => ({
       name: names[index] || file.originalname,
@@ -237,13 +238,27 @@ app.post('/user/docs', upload.array('docs', 10), async (req, res) => {
       s3Key: file.key,
     }));
 
-
+    // ✅ Update or create user's docs
     const updatedUserDocs = await UserDocs.findOneAndUpdate(
       { userId },
       { $push: { documents: { $each: uploadedDocs } } },
       { new: true, upsert: true }
     );
 
+    // ✅ Fetch user info manually (instead of populate)
+    const user = await User.findById(userId).select("name email");
+
+    // ✅ Emit event with merged details
+    uploadedDocs.forEach((doc) => {
+      io.emit("newDocUploaded", {
+        userId: userId,
+        userName: user?.name || "Unknown User",
+        userEmail: user?.email || "No Email",
+        ...doc,
+      });
+    });
+
+    // ✅ Send response
     res.status(201).json({
       success: true,
       message: "Documents uploaded successfully",
@@ -254,6 +269,7 @@ app.post('/user/docs', upload.array('docs', 10), async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 
 
 app.post('/adminData', async (req, res) => {
@@ -311,6 +327,7 @@ app.get('/admin/user/docs/:userId', async (req, res) => {
     // Combine all document arrays into one flat array
     const allDocuments = userDocsList.flatMap(docRecord => docRecord.documents);
 
+    console.log(allDocuments)
     // ✅ Generate signed URLs correctly and return only name + signedUrl
     const docsWithSignedUrls = await Promise.all(
       allDocuments.map(async (doc) => {
@@ -320,7 +337,7 @@ app.get('/admin/user/docs/:userId', async (req, res) => {
       })
     );
 
-    console.log("All docs fetched from AWS:", docsWithSignedUrls);
+    console.log("All docs fetched from AWS:", allDocuments);
     res.json({ success: true, documents: docsWithSignedUrls });
 
   } catch (err) {
@@ -352,10 +369,8 @@ app.get('/viewDoc/:docId', async (req, res) => {
 
 app.get('/api/userDocs/all', async (req, res) => {
   try {
-    // Fetch all userDocs (without populate)
     const allDocs = await UserDocs.find().lean();
 
-    // Manually attach user details
     const result = await Promise.all(
       allDocs.map(async (entry) => {
         const user = await User.findById(entry.userId).select('name email uid');
