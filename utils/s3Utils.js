@@ -1,7 +1,7 @@
 // utils/s3Utils.js
 const { GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
-const { s3 } = require("./upload"); // reuse the same S3 client
+const { s3 } = require("./upload"); 
 
 
 const getSignedFileUrl = async (key) => {

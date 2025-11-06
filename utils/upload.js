@@ -22,12 +22,12 @@ export const upload = multer({
         const timestamp = Date.now();
         const cleanName = file.originalname.replace(/\s+/g, "_");
         const uniqueKey = `${userId}-${timestamp}-${cleanName}`;
-        console.log("📤 Uploading file with key:", uniqueKey);
+        console.log("Uploading file with key:", uniqueKey);
         cb(null, uniqueKey);
       } catch (err) {
         cb(err);
       }
     },
   }),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per file
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
