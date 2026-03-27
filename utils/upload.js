@@ -23,6 +23,7 @@ export const upload = multer({
         const cleanName = file.originalname.replace(/\s+/g, "_");
         const uniqueKey = `${userId}-${timestamp}-${cleanName}`;
         console.log("Uploading file with key:", uniqueKey);
+        console.log("File size:", file.size, "bytes");
         cb(null, uniqueKey);
       } catch (err) {
         cb(err);
@@ -31,3 +32,5 @@ export const upload = multer({
   }),
   limits: { fileSize: 50 * 1024 * 1024 }
 });
+
+console.log("File upload limit: 50 MB");
